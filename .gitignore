@@ -1,3 +1,9 @@
+.pio
+sdkconfig*
+!sdkconfig.defaults
+build
+.vs
+
 # Prerequisites
 *.d
 

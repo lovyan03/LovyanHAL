@@ -1,0 +1,21 @@
+{
+  "name": "LovyanHAL",
+  "description": "Hardware Abstraction Layer library",
+  "keywords": "hal",
+  "authors": {
+    "name": "lovyan03",
+    "url": "https://github.com/lovyan03",
+    "maintainer": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lovyan03/LovyanHAL.git"
+  },
+  "version": "0.0.1",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"],
+  "headers": "LovyanHAL.hpp",
+  "build": {
+    "libArchive": false
+  }
+}
