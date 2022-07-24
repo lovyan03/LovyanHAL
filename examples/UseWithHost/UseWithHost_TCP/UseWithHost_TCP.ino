@@ -80,5 +80,12 @@ void loop()
   {
     lhal::internal::perform_use_with_host(&hal, &st);
   }
-  delay(1);
+
+  static uint_fast8_t prev_interval;
+  uint_fast8_t interval = millis() >> 12;
+  if (prev_interval != interval)
+  {
+    prev_interval = interval;
+    delay(1);
+  }
 }
