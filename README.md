@@ -9,9 +9,9 @@ Hardware Abstraction Layer library. (under construction...)
 現在のところESP32・AVR・Arduino汎用を対象にGPIOのデジタル入出力のみが実装されています。  
 SPI / I2C / Parallel 等の通信機能の実装を計画しています。  
 
-Windowsからの利用も可能です。  
- - マイコン側にexamples/UseWithHostを書込む。  
- - VisualStudioにcmakeオプションを追加し、でexamples_for_PC/CMake_sample をビルドし実行。  
+Windowsからの利用も可能です。(予めマイコン側に制御用プログラムを書き込んでおく必要があります。)  
+ - マイコン側にexamples/UseWithHostを書込む。(ArduinoIDEやVSCodeを使用)  
+ - PC側で examples_for_PC/CMake_sample をビルドし実行。(VisualStudio2022を使用)  
 
 
 ライセンス License

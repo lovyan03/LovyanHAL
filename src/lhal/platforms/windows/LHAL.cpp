@@ -97,8 +97,8 @@ namespace lhal
     dcb.StopBits = ONESTOPBIT;
     dcb.fOutxCtsFlow = FALSE;
     dcb.fOutxDsrFlow = FALSE;
-    dcb.fDtrControl = DTR_CONTROL_ENABLE;
-    dcb.fRtsControl = RTS_CONTROL_ENABLE;
+    dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
+    dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
 
     dcb.fOutX = FALSE;
     dcb.fInX = FALSE;
