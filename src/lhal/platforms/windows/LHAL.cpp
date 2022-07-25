@@ -99,6 +99,7 @@ namespace lhal
     dcb.fOutxDsrFlow = FALSE;
     dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
     dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+    dcb.fDsrSensitivity = FALSE;
 
     dcb.fOutX = FALSE;
     dcb.fInX = FALSE;
