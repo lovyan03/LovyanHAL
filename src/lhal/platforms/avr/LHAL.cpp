@@ -18,7 +18,11 @@ Author:
 
 namespace lhal
 {
-  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO::RAW::reg_output_table[] =
+  LHAL::GPIO_t LHAL::Gpio;
+
+  GPIO_host LHAL::GPIO_Base::getHost(gpio::gpio_pin_t pin) { return GPIO_host { pin }; }
+
+  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO_t::RAW::reg_output_table[] =
   {
 #if defined ( PORTA )
     &PORTA,
@@ -42,7 +46,7 @@ namespace lhal
 #endif
   };
 
-  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO::RAW::reg_input_table[] =
+  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO_t::RAW::reg_input_table[] =
   {
 #if defined ( PINA )
     &PINA,
@@ -66,7 +70,7 @@ namespace lhal
 #endif
   };
 
-  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO::RAW::reg_mode_table[] =
+  constexpr volatile uint8_t* const PROGMEM LHAL::GPIO_t::RAW::reg_mode_table[] =
   {
 #if defined ( DDRA )
     &DDRA,
@@ -91,7 +95,7 @@ namespace lhal
   };
 
 
-  void LHAL::GPIO::writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask)
+  void LHAL::GPIO_t::writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask)
   {
     auto reg = Raw.getOutputReg(port);
     auto sr = LHAL::RAW::disableInterrupt();
@@ -99,7 +103,7 @@ namespace lhal
     LHAL::RAW::enableInterrupt(sr);
   }
 
-  void LHAL::GPIO::writePortLow(gpio::port_num_t port, gpio::pin_mask_t bitmask)
+  void LHAL::GPIO_t::writePortLow(gpio::port_num_t port, gpio::pin_mask_t bitmask)
   {
     auto reg = Raw.getOutputReg(port);
     auto sr = LHAL::RAW::disableInterrupt();
@@ -107,7 +111,7 @@ namespace lhal
     LHAL::RAW::enableInterrupt(sr);
   }
 
-  void LHAL::GPIO::writePort(gpio::port_num_t port, gpio::pin_mask_t bitmask, bool value)
+  void LHAL::GPIO_t::writePort(gpio::port_num_t port, gpio::pin_mask_t bitmask, bool value)
   {
     auto reg = Raw.getOutputReg(port);
     auto sr = LHAL::RAW::disableInterrupt();
@@ -122,12 +126,12 @@ namespace lhal
     LHAL::RAW::enableInterrupt(sr);
   }
 
-  gpio::pin_mask_t LHAL::GPIO::readPort(gpio::port_num_t port, gpio::pin_mask_t bitmask)
+  gpio::pin_mask_t LHAL::GPIO_t::readPort(gpio::port_num_t port, gpio::pin_mask_t bitmask)
   {
     return *Raw.getInputReg(port) & bitmask;
   }
 
-  void LHAL::GPIO::setMode(gpio::gpio_pin_t pp, mode_t mode)
+  void LHAL::GPIO_t::setMode(gpio::gpio_pin_t pp, mode_t mode)
   {
     bool flg_input = !(mode & mode_t::output);
     auto port = getPortNum(pp);

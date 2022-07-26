@@ -23,12 +23,12 @@ Author:
 
 namespace lhal
 {
-  class LHAL : public LHAL_Host
+  class LHAL : public LovyanHAL
   {
     class TransportCom : public internal::ITransportLayer
     {
       HANDLE _com = INVALID_HANDLE_VALUE;
-      char _target[16];
+      const char* _target;
     public:
 
       error_t init(const char* target);
@@ -49,11 +49,16 @@ namespace lhal
       int write(const uint8_t* data, size_t len) override;
     };
 
+    char _target[64] = "";
+
     TransportCom _tl_com;
     TransportSock _tl_sock;
 
   public:
 
     LHAL(const char* target = LHAL_DEFAULT_CONNECTION_NAME);
+    LHAL(internal::ITransportLayer* transport_layer);
+
+    error_t init(void) override;
   };
 }

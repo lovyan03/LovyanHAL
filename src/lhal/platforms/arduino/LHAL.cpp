@@ -18,7 +18,11 @@ Author:
 
 namespace lhal
 {
-  void LHAL::GPIO::setMode(pin_num_t pin, mode_t mode)
+  LHAL::GPIO_t LHAL::Gpio;
+
+  GPIO_host LHAL::GPIO_Base::getHost(gpio::gpio_pin_t pin) { return GPIO_host { pin }; }
+
+  void LHAL::GPIO_t::setMode(pin_num_t pin, mode_t mode)
   {
     uint_fast8_t m = (mode & mode_t::output) ? OUTPUT : INPUT;
     if (m == INPUT)

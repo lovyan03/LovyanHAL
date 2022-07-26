@@ -13,8 +13,18 @@ LHAL hal;
 
 int main(int, char**)
 {
-  // ※ LHALで指定するピン番号はArduinoのピン番号ではなくMCUのピン番号である点に注意すること。;
-  // 　( ESP32の場合はArduinoのピン番号とMCUのピン番号が一致しているので気にしなくても良い )
+  // 最初に インスタンスの init を実行してマイコンと接続する;
+  if (hal.init() != lhal::err_ok)
+  {
+    for (;;)
+    {
+      hal.delay(1000);
+    }
+  }
+
+  // ※ LHALで指定するピン番号はArduinoのピン番号ではなくMCUのピン番号である点に注意すること;
+  // ( ただしLHALが正式対応していないMCUをArduino依存で動作させている場合は、Arduinoのピン番号で指定する )
+  // ( ESP32の場合はArduinoのピン番号とMCUのピン番号が一致しているので気にしなくても良い )
   // Arduino UNOの場合;
   // digital 0 ~ 7 = PortD 0~7 = 0x18~0x1F = 24~31
   // digital 8 ~13 = PortB 0~5 = 0x08~0x0D =  8~13
@@ -24,7 +34,7 @@ int main(int, char**)
   // Arduino環境の4番ピンのMCU番号を得る (ArduinoUnoでは 0x1C = 28が得られる);
   auto pin4 = hal.convertArduinoPinNumber(4);
 
-  // Arduino環境の4番ピンをinput_pullupモードにする。
+  // Arduino環境の4番ピンをinput_pullupモードにする;
   hal.Gpio.setMode(pin4, hal.Gpio.input_pullup);
 
   // 4番ピンを読み取る;
@@ -33,27 +43,33 @@ int main(int, char**)
   // Arduino環境の5番ピンのMCU番号を得る (ArduinoUnoでは 0x1E = 30が得られる);
   auto pin5 = hal.convertArduinoPinNumber(5);
 
-  // Arduino環境の5番ピンをoutputモードにする。
+  // Arduino環境の5番ピンをoutputモードにする;
   hal.Gpio.setMode(pin5, hal.Gpio.output);
 
   // 5番ピンの出力を4番ピンと同じにする;
   hal.Gpio.write(pin5, pin4value);
 
-  auto pin13 = hal.convertArduinoPinNumber(13);
 
-  // 13番ピンをoutputモードにする;
-  hal.Gpio.setMode(pin13, hal.Gpio.output);
+  // Gpio.getHostで特定のピンに対する操作オブジェクトを取得できる;
+
+  // Arduino環境の12番ピンの操作オブジェクトを取得する ( ボタンが接続されている想定 )
+  auto btn = hal.Gpio.getHost(hal.convertArduinoPinNumber(12));
+
+  // Arduino環境の13番ピンの操作オブジェクトを取得する ( LEDが接続されている想定 )
+  auto led = hal.Gpio.getHost(hal.convertArduinoPinNumber(13));
+
+  // ボタンをinputモードにする;
+  btn.setMode( hal.Gpio.input );
+
+  // LEDをoutputモードにする;
+  led.setMode( hal.Gpio.output );
 
   for (;;)
   {
-    // 13番ピンをhighにする;
-    hal.Gpio.writeHigh(pin13);
+    // ボタンの状態を読取り、LEDに反映する;
+    led.write( btn.read() );
 
-    hal.delay(500);
-
-    // 13番ピンをlowにする;
-    hal.Gpio.writeLow(pin13);
-
-    hal.delay(500);
+    // 16ミリ秒待機
+    hal.delay(16);
   }
 }

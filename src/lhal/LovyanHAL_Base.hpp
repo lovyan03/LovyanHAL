@@ -17,9 +17,12 @@ Author:
 
 namespace lhal
 {
-  class LHAL_Base
+  class GPIO_host;
+
+  class LovyanHAL_Base
   {
   /// ここには環境依存のない共通のコードを実装していく。;
+  /// 各MCU環境依存のLHALクラスは、このLovyanHAL_Baseを継承して作成する。;
   public:
     class GPIO_Base
     {
@@ -48,10 +51,12 @@ namespace lhal
 
       static constexpr port_num_t getPortNum(gpio_pin_t port_pin_number) { return port_pin_number >> port_shift; }
       static constexpr pin_mask_t getPinMask(gpio_pin_t port_pin_number) { return 1 << (port_pin_number & ((1 << port_shift) - 1)); }
+
+      GPIO_host getHost(gpio_pin_t pin);
     };
 
-    LHAL_Base(void) {}
-    virtual ~LHAL_Base(void) {}
+    LovyanHAL_Base(void) {}
+    virtual ~LovyanHAL_Base(void) {}
   };
 }
 

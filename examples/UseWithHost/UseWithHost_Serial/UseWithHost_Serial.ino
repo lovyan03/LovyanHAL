@@ -29,7 +29,7 @@ TransportStream st ( &Serial );
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin( lhal::internal::default_serial_baudrate );
 }
 
 void loop()

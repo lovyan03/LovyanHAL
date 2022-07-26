@@ -15,56 +15,98 @@ Author:
 
 #include <thread>
 
-#include "../LHAL_Base.hpp"
+#include "../LovyanHAL_Base.hpp"
 #include "common.hpp"
 
 namespace lhal
 {
-  class LHAL_Host;
-
-  class LHAL_Host : public LHAL_Base
+  class LovyanHAL : public LovyanHAL_Base
   {
   public:
-    class GPIO : public GPIO_Base
+
+    class GPIO_t : public GPIO_Base
     {
-      LHAL_Host* _lhal;
+      LovyanHAL* _lhal;
     public:
-      GPIO(LHAL_Host* hal) : _lhal { hal } {}
-      void setMode(gpio::gpio_pin_t pin, mode_t mode);
+      GPIO_t(LovyanHAL* hal) : _lhal { hal } {}
 
-      void writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask);
-      void writePortLow(gpio::port_num_t port, gpio::pin_mask_t bitmask);
+      GPIO_host getHost(gpio_pin_t pin);
 
-      void writeHigh(gpio::gpio_pin_t pin);
-      void writeLow(gpio::gpio_pin_t pin);
-      void write(gpio::gpio_pin_t pin, bool value) { if (value) { writeHigh(pin); } else { writeLow(pin); } };
-      bool read(gpio::gpio_pin_t pin);
+      void setMode(gpio_pin_t pin, mode_t mode);
+
+      void writePortHigh(port_num_t port, pin_mask_t bitmask);
+      void writePortLow(port_num_t port, pin_mask_t bitmask);
+
+      void writeHigh(gpio_pin_t pin);
+      void writeLow(gpio_pin_t pin);
+      void write(gpio_pin_t pin, bool value) { if (value) { writeHigh(pin); } else { writeLow(pin); } };
+      bool read(gpio_pin_t pin);
     };
 
-    LHAL_Host(void) : LHAL_Base{} {}
-    LHAL_Host(lhal::internal::ITransportLayer* transport_layer) : LHAL_Base{} { setTransportLayer(transport_layer); init(); }
+    LovyanHAL(void);
+    LovyanHAL(internal::ITransportLayer* transport_layer) : LovyanHAL{} { setTransportLayer(transport_layer); }
 
-    GPIO Gpio { this };
+    GPIO_t Gpio { this };
 
     gpio::gpio_pin_t convertArduinoPinNumber(int arduino_pin_number) { return _arduino_pin_table[arduino_pin_number]; }
 
+    virtual error_t init(void);
+
     static uint32_t millis(void);
     static uint32_t micros(void);
-    static inline void delay(size_t msec) { std::this_thread::sleep_for(std::chrono::milliseconds(msec)); }
-    static inline void delayMicroseconds(size_t usec) { std::this_thread::sleep_for(std::chrono::microseconds(usec)); }
+    static void delay(size_t msec);
+    static void delayMicroseconds(size_t usec);
 
   protected:
-    bool setTransportLayer(internal::ITransportLayer* transport_layer);
-    void init(void);
+    error_t setTransportLayer(internal::ITransportLayer* transport_layer);
+    internal::ITransportLayer* _transport = nullptr;
+
+  private:
     gpio::gpio_pin_t _arduino_pin_table[256]; // arduinoピン番号からMCUピン番号への変換テーブル;
 
-    static constexpr size_t cmd_idx = 2; // _sendbuf内でのコマンド部の位置;
-    uint8_t _sendbuf[256]; // 送信バッファ;
-    uint8_t _recvbuf[256]; // 受信バッファ;
+    error_t proc_queue(void);
+    struct queue_data_t
+    {
+      enum state_t
+      {
+        state_free,
+        state_wait_send,
+        state_wait_recv,
+        state_error_send,
+        state_error_recv,
+      };
+      uint8_t sendbuf[256]; // 送信バッファ;
+      uint8_t recvbuf[256]; // 送信バッファ;
+      uint8_t sendlen = 0;
+      uint8_t recvlen = 0;
+      state_t state = state_free;
+    };
+    queue_data_t _queue[256];
+    uint8_t _idx_send_queue = 0;
+    uint8_t _idx_recv_queue = (uint8_t)-1;
+    uint8_t idx_write_queue = 0;
+    uint8_t idx_read_queue = 0;
 
-    bool _sendCommand(size_t len);
+    uint8_t* _sendbuf = _queue[0].sendbuf; // 送信バッファ;
+    uint8_t* _recvbuf = _queue[0].recvbuf; // 受信バッファ;
+    size_t _queued_bytes = 0;
+
+    error_t _sendCommand(size_t len); 
     size_t _recvCommand(void);
-    internal::ITransportLayer* _transport;
+  };
+
+  class GPIO_host
+  {
+    LovyanHAL* _lhal;
+    LovyanHAL::GPIO_t::gpio_pin_t _gpio_pin;
+  public:
+    GPIO_host(LovyanHAL::GPIO_t::gpio_pin_t pin, LovyanHAL* lhal) : _lhal { lhal }, _gpio_pin { pin } {};
+
+    void setMode(LovyanHAL::GPIO_t::mode_t mode) { _lhal->Gpio.setMode(_gpio_pin, mode); }
+    void writeHigh(void) { _lhal->Gpio.writeHigh(_gpio_pin); }
+    void writeLow(void) { _lhal->Gpio.writeLow(_gpio_pin); }
+    void write(bool value) { _lhal->Gpio.write(_gpio_pin, value); }
+    bool read(void) { return _lhal->Gpio.read(_gpio_pin); }
   };
 }
 

@@ -13,15 +13,16 @@ Author:
 #pragma once
 
 #include "init.hpp"
-#include "../../LHAL_Base.hpp"
+#include "../../LovyanHAL_Base.hpp"
 
 namespace lhal
 {
-  class LHAL : public LHAL_Base
+  class LHAL : public LovyanHAL_Base
   {
   public:
-    class GPIO : public GPIO_Base
+    class GPIO_t : public GPIO_Base
     {
+    public:
       /// RAW : environment-dependent API (環境依存API);
       /// avrでRAWクラスを使ってレジスタに直接値を書き込む場合は事前にdisableInterruptを呼び出してSREGの内容を保持しておき、;
       /// レジスタの操作を終えたらenableInterruptを呼び出して 保持しておいたSREGの値を復元すること。;
@@ -49,8 +50,6 @@ namespace lhal
         static inline void writeRegLow(volatile uint8_t* reg, gpio::pin_mask_t bitmask) { *reg &= ~bitmask; };
       };
 
-    public:
-
       static RAW Raw;
 
       static void writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask);
@@ -66,8 +65,6 @@ namespace lhal
       static inline bool read(gpio::gpio_pin_t pin) { return readPort(getPortNum(pin), getPinMask(pin)); }
     };
 
-    LHAL(void) : LHAL_Base() {}
-
     class RAW
     {
     public:
@@ -75,8 +72,12 @@ namespace lhal
       static inline void enableInterrupt(uint_fast8_t sr) { SREG = sr; };
     };
 
-    RAW Raw;
-    GPIO Gpio;
+    LHAL(void) : LovyanHAL_Base() {}
+
+    static error_t init(void) { return error_t::err_ok; }
+
+    static RAW Raw;
+    static GPIO_t Gpio;
 
 #if defined ( digitalPinToPort )
 
@@ -89,5 +90,26 @@ namespace lhal
     static constexpr gpio::gpio_pin_t convertArduinoPinNumber(int arduino_pin_number) { return arduino_pin_number; }
 #endif
 
+  };
+
+  class GPIO_host
+  {
+    volatile uint8_t* _reg_output;
+    volatile uint8_t* _reg_input;
+    gpio::pin_mask_t _pin_mask;
+    LHAL::GPIO_t::gpio_pin_t _gpio_pin;
+  public:
+    GPIO_host(LHAL::GPIO_t::gpio_pin_t pin) :
+      _reg_output { LHAL::GPIO_t::RAW::getOutputReg(LHAL::GPIO_t::getPortNum(_gpio_pin)) },
+      _reg_input { LHAL::GPIO_t::RAW::getInputReg(LHAL::GPIO_t::getPortNum(_gpio_pin)) },
+      _pin_mask { LHAL::GPIO_t::getPinMask(_gpio_pin) },
+      _gpio_pin { pin }
+    {};
+
+    void setMode(LHAL::GPIO_t::mode_t mode) { LHAL::Gpio.setMode(_gpio_pin, mode); }
+    void writeHigh(void) { auto sr = LHAL::RAW::disableInterrupt(); *_reg_output |= _pin_mask; LHAL::RAW::enableInterrupt(sr); }
+    void writeLow(void) { auto sr = LHAL::RAW::disableInterrupt(); *_reg_output &= ~_pin_mask; LHAL::RAW::enableInterrupt(sr); }
+    void write(bool value) { if (value) { writeHigh(); } else { writeLow(); } }
+    bool read(void) { return *_reg_input & _pin_mask; }
   };
 }

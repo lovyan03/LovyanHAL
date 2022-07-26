@@ -25,7 +25,11 @@ Author:
 
 namespace lhal
 {
-  void LHAL::GPIO::setMode(gpio::gpio_pin_t pin, mode_t mode)
+  LHAL::GPIO_t LHAL::Gpio;
+
+  GPIO_host LHAL::GPIO_Base::getHost(gpio::gpio_pin_t pin) { return GPIO_host { pin }; }
+
+  void LHAL::GPIO_t::setMode(gpio::gpio_pin_t pin, mode_t mode)
   {
     if (pin >= GPIO_NUM_MAX) { return; }
 

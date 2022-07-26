@@ -76,36 +76,38 @@ namespace lhal
 
     if (hCom == INVALID_HANDLE_VALUE)
     { // Handle the error. 
-      printf("CreateFile failed with error %d.\n", GetLastError());
+      //printf("%s : CreateFile failed with error %d.\n", name, GetLastError());
       return INVALID_HANDLE_VALUE;
     }
 
-    int check = SetupComm(hCom, 1024, 1024);
+    int check = SetupComm(hCom, 4096, 256);
     if (check == FALSE) {
-      printf("SetupComm failed with error %d.\n", GetLastError());
+      printf("%s : SetupComm failed with error %d.\n", name, GetLastError());
       CloseHandle(hCom);
       return INVALID_HANDLE_VALUE;
     }
 
     DCB dcb;
     GetCommState(hCom, &dcb);
+    // 以下の設定は変更するとボードによっては通信不能になるので、環境から取得した値のままでよい。変更しないこと。;
+    // dcb.fOutxCtsFlow ;
+    // dcb.fOutxDsrFlow ;
+    // dcb.fDtrControl ;
+    // dcb.fRtsControl ;
+    // dcb.fDsrSensitivity ;
+
     dcb.DCBlength = sizeof(DCB);
-    dcb.BaudRate = 115200;
+    dcb.BaudRate = lhal::internal::default_serial_baudrate;
     dcb.ByteSize = 8;
     dcb.fBinary = TRUE;
     dcb.fParity = NOPARITY;
     dcb.StopBits = ONESTOPBIT;
-    dcb.fOutxCtsFlow = FALSE;
-    dcb.fOutxDsrFlow = FALSE;
-    dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
-    dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
-    dcb.fDsrSensitivity = FALSE;
 
     dcb.fOutX = FALSE;
     dcb.fInX = FALSE;
     dcb.fTXContinueOnXoff = TRUE;
-    dcb.XonLim = 512;
-    dcb.XoffLim = 512;
+    dcb.XonLim = 128;
+    dcb.XoffLim = 128;
     dcb.XonChar = 0x11;
     dcb.XoffChar = 0x13;
 
@@ -118,7 +120,7 @@ namespace lhal
 
     check = SetCommState(hCom, &dcb);
     if (check == FALSE) {
-      printf("SetCommState failed with error %d.\n", GetLastError());
+      printf("%s : SetCommState failed with error %d.\n", name, GetLastError());
       CloseHandle(hCom);
       return INVALID_HANDLE_VALUE;
     }
@@ -127,13 +129,14 @@ namespace lhal
     GetCommTimeouts(hCom, &TimeOut);
 
     TimeOut.ReadTotalTimeoutMultiplier = 0;
-    TimeOut.ReadTotalTimeoutConstant = 128;
-    TimeOut.WriteTotalTimeoutMultiplier = 0;
-    TimeOut.WriteTotalTimeoutConstant = 128;
+    TimeOut.ReadTotalTimeoutConstant = 0;
+    TimeOut.WriteTotalTimeoutMultiplier = 1;
+    TimeOut.WriteTotalTimeoutConstant = 256;
+    TimeOut.ReadIntervalTimeout = MAXDWORD;
 
     check = SetCommTimeouts(hCom, &TimeOut);
     if (check == FALSE) {
-      printf("SetCommTimeouts failed with error %d.\n", GetLastError());
+      printf("%s : SetCommTimeouts failed with error %d.\n", name, GetLastError());
       CloseHandle(hCom);
       return INVALID_HANDLE_VALUE;
     }
@@ -143,7 +146,7 @@ namespace lhal
       PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR
     );
     if (check == FALSE) {
-      printf("PurgeComm failed with error %d.\n", GetLastError());
+      printf("%s : PurgeComm failed with error %d.\n", name, GetLastError());
       CloseHandle(hCom);
       return INVALID_HANDLE_VALUE;
     }
@@ -155,14 +158,21 @@ namespace lhal
 
   error_t LHAL::TransportCom::init(const char* target)
   {
-    strcpy_s(_target, sizeof(_target), target);
-    _com = createComHandle(target);
-    if (_com == INVALID_HANDLE_VALUE)
+    if (target == nullptr || target[0] == 0)
     {
+      _target = nullptr;
+      disconnect();
       return error_t::err_failed;
     }
 
-    return error_t::err_ok;
+    _com = createComHandle(target);
+    if (_com != INVALID_HANDLE_VALUE)
+    {
+      _target = target;
+      printf("%s : Open succeed. \n", target);
+      return error_t::err_ok;
+    }
+    return error_t::err_failed;
   }
 
   int LHAL::TransportCom::write(const uint8_t* data, size_t len)
@@ -184,7 +194,10 @@ namespace lhal
   error_t LHAL::TransportCom::connect(void)
   {
     disconnect();
-    _com = createComHandle(_target);
+    if (_target != nullptr && _target[0] != 0)
+    {
+      _com = createComHandle(_target);
+    }
     return (_com == INVALID_HANDLE_VALUE) ? error_t::err_failed : error_t::err_ok;
   }
 
@@ -204,31 +217,17 @@ namespace lhal
   error_t LHAL::TransportSock::init(const char* target)
   {
     _sock = createSockHandle(target);
-    return (_sock == 0) ? error_t::err_failed : error_t::err_ok;
+
+    if (_sock != 0)
+    {
+      printf("%s : Connected. \n", target);
+      return error_t::err_ok;
+    }
+    return error_t::err_failed;
   }
 
   int LHAL::TransportSock::write(const uint8_t* data, size_t len)
   {
-    static size_t send_count = 0;
-    static uint32_t prev_usec;
-    std::this_thread::yield();
-    uint32_t usec = LHAL::millis();
-    uint32_t diff = usec - prev_usec;
-    if (diff < 4)
-    {
-      send_count += len + 256;
-      if (send_count > 1024)
-      {
-        send_count = 0;
-        delay(1);
-        std::this_thread::yield();
-      }
-    }
-    else
-    {
-      send_count = len + 64;
-    }
-    prev_usec = usec;
     auto res = send(_sock, (const char*)data, len, 0);
     if (res != len)
     {
@@ -246,50 +245,78 @@ namespace lhal
 
 // --------------------------------------------------------------------------------
 
-  LHAL::LHAL(const char* target)
+  LHAL::LHAL(internal::ITransportLayer* transport_layer)
+    : LovyanHAL { transport_layer }
   {
-    bool connect_mcu = false;;
-    if (target == nullptr)
+  }
+
+  LHAL::LHAL(const char* target)
+   : LovyanHAL {}
+  {
+    if (target)
     {
-      char filename[8];
-      for (int i = 2; !connect_mcu && i < 99; ++i)
-      {
-        snprintf(filename, sizeof(filename), "COM%d", i);
-        if (error_t::err_ok == _tl_com.init(filename))
-        {
-          connect_mcu = setTransportLayer(&_tl_com);
-        }
-      }
+      strcpy_s(_target, sizeof(_target), target);
     }
     else
     {
-      if (tolower(target[0]) == 'c' && tolower(target[1]) == 'o' && tolower(target[2]) == 'm' && target[3] >= '0' && target[3] <= '9')
+      _target[0] = 0;
+    }
+  }
+
+  error_t LHAL::init(void)
+  {
+    if (_transport == nullptr)
+    {
+      error_t result = error_t::err_failed;
+      if (_target[0] == 0)
       {
-        if (error_t::err_ok != _tl_com.init(target))
+        for (int i = 2; (error_t::err_ok != result) && i < 100; ++i)
         {
-          printf("com open failed.");
-        }
-        else
-        {
-          connect_mcu = setTransportLayer(&_tl_com);
+          snprintf(_target, sizeof(_target), "COM%d", i);
+          if (error_t::err_ok == _tl_com.init(_target))
+          {
+            result = setTransportLayer(&_tl_com);
+            if (result != error_t::err_ok)
+            {
+              printf("%s : Response nothing...\n", _target);
+              _target[0] = 0;
+              _tl_com.init(nullptr);
+            }
+          }
         }
       }
       else
       {
-        if (error_t::err_ok != _tl_sock.init(target))
+        if (tolower(_target[0]) == 'c' && tolower(_target[1]) == 'o' && tolower(_target[2]) == 'm' && _target[3] >= '0' && _target[3] <= '9')
         {
-          printf("socket open failed.");
+          if (error_t::err_ok == _tl_com.init(_target))
+          {
+            result = setTransportLayer(&_tl_com);
+          }
+          else
+          {
+            printf("com open failed.\n");
+          }
         }
         else
         {
-          connect_mcu = setTransportLayer(&_tl_sock);
+          if (error_t::err_ok != _tl_sock.init(_target))
+          {
+            printf("socket open failed.\n");
+          }
+          else
+          {
+            result = setTransportLayer(&_tl_sock);
+          }
         }
       }
+      if (result != error_t::err_ok)
+      {
+        printf("connection not found.\n");
+        return result;
+      }
     }
-    if (connect_mcu)
-    {
-      init();
-    }
+    return LovyanHAL::init();
   }
 }
 
