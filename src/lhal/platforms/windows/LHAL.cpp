@@ -316,6 +316,7 @@ namespace lhal
         return result;
       }
     }
+    printf("connect !\n");
     return LovyanHAL::init();
   }
 }

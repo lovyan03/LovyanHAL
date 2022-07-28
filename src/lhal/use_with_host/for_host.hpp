@@ -62,9 +62,13 @@ namespace lhal
     internal::ITransportLayer* _transport = nullptr;
 
   private:
+    static constexpr size_t timeout_msec = 512;
+
     gpio::gpio_pin_t _arduino_pin_table[256]; // arduinoピン番号からMCUピン番号への変換テーブル;
 
     error_t proc_queue(void);
+    error_t _proc_receive(void);
+
     struct queue_data_t
     {
       enum state_t
@@ -82,10 +86,10 @@ namespace lhal
       state_t state = state_free;
     };
     queue_data_t _queue[256];
+    uint8_t _idx_next_queue = 0;
+    uint8_t _idx_current_queue = (uint8_t)-1;
     uint8_t _idx_send_queue = 0;
-    uint8_t _idx_recv_queue = (uint8_t)-1;
-    uint8_t idx_write_queue = 0;
-    uint8_t idx_read_queue = 0;
+    uint8_t _idx_recv_queue = 0;
 
     uint8_t* _sendbuf = _queue[0].sendbuf; // 送信バッファ;
     uint8_t* _recvbuf = _queue[0].recvbuf; // 受信バッファ;

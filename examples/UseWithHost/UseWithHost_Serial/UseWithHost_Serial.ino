@@ -20,6 +20,7 @@ public:
 
   int write(const uint8_t* value, size_t len) override
   {
+    _st->flush();
     return _st->write(value, len);
   }
 };

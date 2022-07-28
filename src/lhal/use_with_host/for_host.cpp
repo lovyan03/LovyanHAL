@@ -29,24 +29,37 @@ namespace lhal
   error_t LovyanHAL::setTransportLayer(internal::ITransportLayer* transport_layer)
   {
     _transport = transport_layer;
-    _sendbuf[internal::cmd_payload_idx + 0] = internal::command::check_lhal_device;
-    _sendbuf[internal::cmd_payload_idx + 1] = 0xAA;
-    _sendbuf[internal::cmd_payload_idx + 2] = 0x55;
+
     int retry = 4;
     do
     {
+      _idx_next_queue = 0;
+      _idx_current_queue = (uint8_t)-1;
+      _idx_send_queue = 0;
+      _idx_recv_queue = 0;
+
+      _sendbuf[internal::cmd_payload_idx + 0] = internal::command::check_lhal_device;
+      _sendbuf[internal::cmd_payload_idx + 1] = 0xAA;
+      _sendbuf[internal::cmd_payload_idx + 2] = 0x55;
       if (_sendCommand(3) == error_t::err_ok)
       {
         auto recvlen = _recvCommand();
         if (recvlen == 3 + internal::cmd_prefix_len + internal::cmd_suffix_len)
         {
           //if (memcmp((void*)_sendbuf, (const void*)_recvbuf, recvlen) == 0)
-          if (memcmp((void*)_queue[_idx_recv_queue].sendbuf, (const void*)_queue[_idx_recv_queue].recvbuf, recvlen) == 0)
+          if (memcmp(_queue[_idx_current_queue].sendbuf, _queue[_idx_current_queue].recvbuf, recvlen) == 0)
           {
             return error_t::err_ok;
           }
         }
       }
+      _transport->disconnect();
+      delay(16);
+      _transport->connect();
+      memset(_sendbuf, 0, 256);
+      _transport->write(_sendbuf, 256);
+      delay(16);
+      while (_transport->read() >= 0);
     } while (--retry);
     return error_t::err_failed;
   }
@@ -134,7 +147,7 @@ namespace lhal
     if (!_transport) { return error_t::err_failed; }
     if (len > internal::cmd_payload_maxlen) { return error_t::err_failed; }
     _sendbuf[internal::cmd_stx_idx] = internal::control_code::stx;
-    _sendbuf[internal::cmd_seqnum_idx] = _idx_send_queue;
+    _sendbuf[internal::cmd_seqnum_idx] = _idx_next_queue;
     _sendbuf[internal::cmd_datalen_idx] = len + internal::cmd_suffix_len;
     _sendbuf[internal::cmd_datalen_idx + len + 2] = internal::control_code::etx;
     len += internal::cmd_prefix_len;
@@ -147,110 +160,115 @@ namespace lhal
     len += internal::cmd_suffix_len;
 
 
-    while (_queued_bytes >= 192 && (proc_queue() == error_t::err_ok));
+//    while (_queued_bytes >= 192 && (proc_queue() == error_t::err_ok));
 
 
-    _queue[_idx_send_queue].recvlen = 0;
-    _queue[_idx_send_queue].sendlen = len;
-    _queue[_idx_send_queue].state = queue_data_t::state_wait_send;
-    proc_queue();
+    _queue[_idx_next_queue].recvlen = 0;
+    _queue[_idx_next_queue].sendlen = len;
+    _queue[_idx_next_queue].state = queue_data_t::state_wait_send;
+    auto result = proc_queue();
+    if (result != error_t::err_ok) { return result; }
 
-    _idx_recv_queue = _idx_send_queue++;
-    while (_queue[_idx_send_queue].state != queue_data_t::state_free)
+    _idx_current_queue = _idx_next_queue++;
+    while (_queue[_idx_next_queue].state != queue_data_t::state_free)
     {
       // ToDo: exception throw して処理を終える？
-      printf("queue jam.");
+      printf("queue jam.\n");
       return error_t::err_failed;
     }
-    _sendbuf = _queue[_idx_send_queue].sendbuf;
-    _recvbuf = _queue[_idx_send_queue].recvbuf;
+    _sendbuf = _queue[_idx_next_queue].sendbuf;
+    _recvbuf = _queue[_idx_next_queue].recvbuf;
+    return error_t::err_ok;
+  }
+
+  error_t LovyanHAL::_proc_receive(void)
+  {
+    auto q = &_queue[_idx_recv_queue];
+    if (q->state != queue_data_t::state_wait_recv)
+    {
+      return error_t::err_ok;
+    }
+
+    int val;
+    while ((val = _transport->read()) >= 0)
+    {
+      if ((q->recvlen == internal::cmd_stx_idx) && (val != internal::control_code::stx))
+      {
+        // ToDo:データ異常対策の実装?;
+        printf("error: receive unknown data: %02x  %c  \n", val, val);
+        continue;
+      }
+
+      q->recvbuf[q->recvlen] = val;
+      switch (q->recvlen++)
+      {
+      case internal::cmd_stx_idx:
+        break;
+
+      case internal::cmd_seqnum_idx:
+        if (val != _idx_recv_queue)
+        { // ToDo:データ異常対策の実装;
+          printf("error: receive sequence mismatch. send:%02x  recv:%02x\n", _idx_recv_queue, val);
+          return error_t::err_failed;
+        }
+        break;
+
+      case internal::cmd_datalen_idx:
+        break;
+
+      default:
+        if ((q->recvbuf[internal::cmd_datalen_idx] + internal::cmd_payload_idx) == q->recvlen)
+        {
+          if (val != internal::control_code::etx)
+          { // ToDo:データ異常対策の実装;
+            printf("error: receive etx mismatch. seq:%02x\n", _idx_recv_queue);
+            q->state = q->state_error_recv;
+            return error_t::err_failed;
+          }
+          else
+          {
+            uint_fast8_t checksum = 0;
+            for (int i = 0; i < q->recvlen; ++i)
+            {
+              checksum ^= q->recvbuf[i];
+            }
+            if (checksum != 0)
+            { // ToDo:データ異常対策の実装;
+              printf("error: receive checksum mismatch. seq:%02x\n", _idx_recv_queue);
+              q->state = q->state_error_recv;
+              return error_t::err_failed;
+            }
+            _queued_bytes -= q->sendlen;
+            q->state = q->state_free;
+            q = &_queue[++_idx_recv_queue];
+            return error_t::err_ok;
+          }
+        }
+        break;
+      }
+    }
     return error_t::err_ok;
   }
 
   error_t LovyanHAL::proc_queue(void)
   {
-    auto q = &_queue[idx_read_queue];
-    if (q->state == queue_data_t::state_wait_recv)
+    auto ms = millis();
+    do
     {
-      int val;
-      for (int i = 0; i < 16; ++i)
+      if (millis() - ms > timeout_msec)
       {
-        val = _transport->read();
-        if (val < 0 || val == internal::control_code::stx) { break; }
+        printf("error: receive timeout.\n");
+        return error_t::err_failed;
       }
-      if (val == internal::control_code::stx)
+      error_t result = _proc_receive();
+      if (result != error_t::err_ok)
       {
-        q->recvbuf[0] = val;
-        uint_fast8_t checksum = val;
-        uint_fast8_t recv_idx = 1;
-        uint_fast8_t remain_len = 0;
-        int retry = 65536;
-        bool succeed = false;
-        while (!succeed && --retry)
-        {
-          val = _transport->read();
-          if (val < 0)
-          {
-            std::this_thread::yield();
-            continue;
-          }
-          //_transport->write(0);
-          retry = 65536;
-
-          q->recvbuf[recv_idx] = val;
-          checksum ^= val;
-          switch (recv_idx++)
-          {
-          case internal::cmd_seqnum_idx:
-            if (val != q->sendbuf[internal::cmd_seqnum_idx])
-            {
-              recv_idx = 0;
-              checksum = 0;
-            }
-            break;
-
-          case internal::cmd_stx_idx:
-            if (val != internal::control_code::stx)
-            {  // STX?
-              recv_idx = 0;
-              checksum = 0;
-            }
-            break;
-
-          case internal::cmd_datalen_idx:
-            remain_len = val;
-            break;
-
-          default:
-            if (--remain_len == 0)
-            {
-              q->recvlen = recv_idx;
-              /// ETX + CheckSum ?
-              if (q->recvbuf[recv_idx - 1] == internal::control_code::etx && checksum == 0)
-              {
-                succeed = true;
-                _queued_bytes -= q->sendlen;
-                q->state = queue_data_t::state_free;
-                ++idx_read_queue;
-                break;
-              }
-              recv_idx = 0;
-              checksum = 0;
-            }
-            break;
-          }
-        }
-        // retryが0なら受信失敗、retryが残っているなら受信成功;
-        if (!retry)
-        {
-          q->state = queue_data_t::state_error_recv;
-          return error_t::err_failed;
-        }
+        return result;
       }
-    }
+    } while (_queued_bytes >= 192);
 
     {
-      auto q = &_queue[idx_write_queue];
+      auto q = &_queue[_idx_send_queue];
       if (q->state == queue_data_t::state_wait_send)
       {
         // データ送信処理;
@@ -259,7 +277,7 @@ namespace lhal
         while (!_transport->write((const uint8_t*)q->sendbuf, q->sendlen) && --retry)
         {
           _transport->disconnect();
-          std::this_thread::sleep_for(std::chrono::milliseconds(16));
+          delay(16);
           _transport->connect();
         }
         // retryが0なら送信失敗、retryが残っているなら送信成功;
@@ -269,7 +287,7 @@ namespace lhal
           return error_t::err_failed;
         }
         q->state = queue_data_t::state_wait_recv;
-        idx_write_queue++;
+        _idx_send_queue++;
       }
     }
     return error_t::err_ok;
@@ -277,21 +295,27 @@ namespace lhal
 
   size_t LovyanHAL::_recvCommand(void)
   {
-    _recvbuf = _queue[_idx_recv_queue].recvbuf;
-    while (_queue[_idx_recv_queue].state != queue_data_t::state_free)
+    auto ms = millis();
+    _recvbuf = _queue[_idx_current_queue].recvbuf;
+    while (_queue[_idx_current_queue].state != queue_data_t::state_free)
     {
+      if (millis() - ms > timeout_msec)
+      {
+        printf("error: receive timeout.\n");
+        return error_t::err_failed;
+      }
       proc_queue();
 //    std::this_thread::yield();
-      if (_queue[_idx_recv_queue].state == queue_data_t::state_error_send)
+      if (_queue[_idx_current_queue].state == queue_data_t::state_error_send)
       {
         return 0;
       }
-      if (_queue[_idx_recv_queue].state == queue_data_t::state_error_recv)
+      if (_queue[_idx_current_queue].state == queue_data_t::state_error_recv)
       {
         return 0;
       }
     }
-    return _queue[_idx_recv_queue].recvlen;
+    return _queue[_idx_current_queue].recvlen;
 
     uint_fast8_t recv_idx = 0;
     uint_fast8_t sendlen = 0;
