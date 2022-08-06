@@ -10,19 +10,19 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#include "../init.hpp"
+#include "../../platform_check.hpp"
 
-#if LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_ARDUINO
+#if defined (LHAL_TARGET_PLATFORM) && (LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_ARDUINO)
 
 #include "LHAL.hpp"
 
 namespace lhal
 {
-  LHAL::GPIO_t LHAL::Gpio;
+  LovyanHAL::GPIO_HAL LovyanHAL::Gpio;
 
-  GPIO_host LHAL::GPIO_Base::getHost(gpio::gpio_pin_t pin) { return GPIO_host { pin }; }
+  GPIO_host LovyanHAL::GPIO_HAL_Base::getHost(gpio_port_pin_t pin) { return GPIO_host { pin }; }
 
-  void LHAL::GPIO_t::setMode(pin_num_t pin, mode_t mode)
+  void LovyanHAL::GPIO_HAL::setMode(gpio_port_pin_t pin, mode_t mode)
   {
     uint_fast8_t m = (mode & mode_t::output) ? OUTPUT : INPUT;
     if (m == INPUT)
@@ -43,7 +43,7 @@ namespace lhal
     else
     {
 #if defined(OPEN_DRAIN)
-      if (mode & mode_t::opendrain)
+      if (mode & mode_t::output_opendrain)
       {
         m |= OPEN_DRAIN;
       }

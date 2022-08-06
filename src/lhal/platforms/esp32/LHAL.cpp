@@ -10,9 +10,9 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#include "../init.hpp"
+#include "../../platform_check.hpp"
 
-#if LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_ESP32
+#if defined (LHAL_TARGET_PLATFORM) && (LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_ESP32)
 
 #include "LHAL.hpp"
 
@@ -25,18 +25,34 @@ Author:
 
 namespace lhal
 {
-  LHAL::GPIO_t LHAL::Gpio;
+  LovyanHAL::GPIO_HAL LovyanHAL::Gpio;
 
-  GPIO_host LHAL::GPIO_Base::getHost(gpio::gpio_pin_t pin) { return GPIO_host { pin }; }
+  GPIO_host LovyanHAL::GPIO_HAL_Base::getHost(gpio_port_pin_t pin) { return GPIO_host { pin }; }
 
-  void LHAL::GPIO_t::setMode(gpio::gpio_pin_t pin, mode_t mode)
+  volatile uint32_t* const LovyanHAL::GPIO_HAL::RAW::_write_reg[][2] =
+  {
+    { reinterpret_cast<uint32_t*>(GPIO_OUT_W1TC_REG), reinterpret_cast<uint32_t*>(GPIO_OUT_W1TS_REG) },
+#if defined ( GPIO_OUT1_REG )
+    { reinterpret_cast<uint32_t*>(GPIO_OUT1_W1TC_REG), reinterpret_cast<uint32_t*>(GPIO_OUT1_W1TS_REG) },
+#endif
+  };
+
+  volatile uint32_t* const LovyanHAL::GPIO_HAL::RAW::_read_reg[] =
+  {
+    reinterpret_cast<uint32_t*>(GPIO_IN_REG),
+#if defined ( GPIO_OUT1_REG )
+    reinterpret_cast<uint32_t*>(GPIO_IN1_REG),
+#endif
+  };
+
+  void LovyanHAL::GPIO_HAL::setMode(gpio_port_pin_t pin, mode_t mode)
   {
     if (pin >= GPIO_NUM_MAX) { return; }
-
-    gpio_set_direction((::gpio_num_t)pin, GPIO_MODE_DISABLE);
+    auto num = (gpio_num_t)pin;
+    gpio_set_direction(num, GPIO_MODE_DISABLE);
 
 #if SOC_RTCIO_INPUT_OUTPUT_SUPPORTED
-    if (rtc_gpio_is_valid_gpio((gpio_num_t)pin)) { rtc_gpio_deinit((gpio_num_t)pin); }
+    if (rtc_gpio_is_valid_gpio(num)) { rtc_gpio_deinit(num); }
 #endif
     gpio_mode_t m = GPIO_MODE_INPUT;
     if (mode & mode_t::output)
@@ -63,7 +79,7 @@ namespace lhal
     io_conf.pull_up_en   = (mode == mode_t::input_pullup  ) ? GPIO_PULLUP_ENABLE   : GPIO_PULLUP_DISABLE;
     io_conf.pull_down_en = (mode == mode_t::input_pulldown) ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.pin_bit_mask = (uint64_t)1 << pin;
+    io_conf.pin_bit_mask = (uint64_t)1 << num;
     gpio_config(&io_conf);
   }
 }

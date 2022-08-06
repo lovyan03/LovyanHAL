@@ -12,13 +12,12 @@ Author:
 /----------------------------------------------------------------------------*/
 #pragma once
 
-#include "../init.hpp"
+#include <stdint.h>
 
 namespace lhal
 {
   namespace gpio
   {
-    typedef uint8_t gpio_pin_t;   // ポート番号+ピン番号の型;
     typedef uint8_t port_num_t;   // ポート番号用の型;
     typedef uint8_t pin_num_t;    // ポート内ピン番号の型;
     typedef uint8_t pin_mask_t;   // 同一ポート内でのピンビットマスク値;

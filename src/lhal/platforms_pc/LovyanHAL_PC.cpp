@@ -10,23 +10,32 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
+#include "../platform_check.hpp"
+
+#if ( LHAL_TARGET_PLATFORM_NUMBER < LHAL_PLATFORM_NUMBER_PC_MAX )
+
 #include "../init.hpp"
 
-#if (LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_WINDOWS) \
- || (LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_LINUX)
-
-#include "for_host.hpp"
+#include "LovyanHAL_PC.hpp"
 
 #include <string.h>
+#include <algorithm>
 
 namespace lhal
 {
-  GPIO_host LovyanHAL::GPIO_t::getHost(gpio_pin_t pin) { return GPIO_host { pin, _lhal }; }
+  GPIO_host LovyanHAL_PC::GPIO_HAL::getHost(gpio_port_pin_t pin) { return GPIO_host { pin, _lhal }; }
 
-  LovyanHAL::LovyanHAL(void) : LovyanHAL_Base{}
+  uint8_t LovyanHAL_PC::getBusSequenceNumber(IBus* bus)
+  {
+    uint8_t res = _bus_count++;
+    _bus_list[res] = bus;
+    return res;
+  }
+
+  LovyanHAL_PC::LovyanHAL_PC(void) : LovyanHAL_Base{}
   {}
 
-  error_t LovyanHAL::setTransportLayer(internal::ITransportLayer* transport_layer)
+  error_t LovyanHAL_PC::setTransportLayer(internal::ITransportLayer* transport_layer)
   {
     _transport = transport_layer;
 
@@ -64,7 +73,7 @@ namespace lhal
     return error_t::err_failed;
   }
 
-  error_t LovyanHAL::init(void)
+  error_t LovyanHAL_PC::init(void)
   {
     int pin = 0;
     for (int i = 0; i < 2; ++i)
@@ -101,21 +110,21 @@ namespace lhal
 
   static auto _start_time = std::chrono::system_clock::now();
 
-  uint32_t LovyanHAL::millis(void)
+  uint32_t LovyanHAL_PC::millis(void)
   {
     auto end = std::chrono::system_clock::now();
     auto dur = end - _start_time;
     return std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
   }
 
-  uint32_t LovyanHAL::micros(void)
+  uint32_t LovyanHAL_PC::micros(void)
   {
     auto end = std::chrono::system_clock::now();
     auto dur = end - _start_time;
     return std::chrono::duration_cast<std::chrono::microseconds>(dur).count();
   }
 
-  void LovyanHAL::delay(size_t msec)
+  void LovyanHAL_PC::delay(size_t msec)
   {
     if (msec < 32)
     {
@@ -132,7 +141,7 @@ namespace lhal
     }
   }
 
-  void LovyanHAL::delayMicroseconds(size_t usec)
+  void LovyanHAL_PC::delayMicroseconds(size_t usec)
   {
     auto us = micros();
     do
@@ -142,7 +151,7 @@ namespace lhal
   }
 
 
-  error_t LovyanHAL::_sendCommand(size_t len)
+  error_t LovyanHAL_PC::_sendCommand(size_t len)
   {
     if (!_transport) { return error_t::err_failed; }
     if (len > internal::cmd_payload_maxlen) { return error_t::err_failed; }
@@ -172,7 +181,7 @@ namespace lhal
     _idx_current_queue = _idx_next_queue++;
     while (_queue[_idx_next_queue].state != queue_data_t::state_free)
     {
-      // ToDo: exception throw ‚µ‚Äˆ—‚ðI‚¦‚éH
+      // ToDo: exception throw ã—ã¦å‡¦ç†ã‚’çµ‚ãˆã‚‹ï¼Ÿ
       printf("queue jam.\n");
       return error_t::err_failed;
     }
@@ -181,7 +190,7 @@ namespace lhal
     return error_t::err_ok;
   }
 
-  error_t LovyanHAL::_proc_receive(void)
+  error_t LovyanHAL_PC::_proc_receive(void)
   {
     auto q = &_queue[_idx_recv_queue];
     if (q->state != queue_data_t::state_wait_recv)
@@ -194,7 +203,7 @@ namespace lhal
     {
       if ((q->recvlen == internal::cmd_stx_idx) && (val != internal::control_code::stx))
       {
-        // ToDo:ƒf[ƒ^ˆÙí‘Îô‚ÌŽÀ‘•?;
+        // ToDo:ãƒ‡ãƒ¼ã‚¿ç•°å¸¸å¯¾ç­–ã®å®Ÿè£…?;
         printf("error: receive unknown data: %02x  %c  \n", val, val);
         continue;
       }
@@ -207,7 +216,7 @@ namespace lhal
 
       case internal::cmd_seqnum_idx:
         if (val != _idx_recv_queue)
-        { // ToDo:ƒf[ƒ^ˆÙí‘Îô‚ÌŽÀ‘•;
+        { // ToDo:ãƒ‡ãƒ¼ã‚¿ç•°å¸¸å¯¾ç­–ã®å®Ÿè£…;
           printf("error: receive sequence mismatch. send:%02x  recv:%02x\n", _idx_recv_queue, val);
           return error_t::err_failed;
         }
@@ -220,7 +229,7 @@ namespace lhal
         if ((q->recvbuf[internal::cmd_datalen_idx] + internal::cmd_payload_idx) == q->recvlen)
         {
           if (val != internal::control_code::etx)
-          { // ToDo:ƒf[ƒ^ˆÙí‘Îô‚ÌŽÀ‘•;
+          { // ToDo:ãƒ‡ãƒ¼ã‚¿ç•°å¸¸å¯¾ç­–ã®å®Ÿè£…;
             printf("error: receive etx mismatch. seq:%02x\n", _idx_recv_queue);
             q->state = q->state_error_recv;
             return error_t::err_failed;
@@ -233,7 +242,7 @@ namespace lhal
               checksum ^= q->recvbuf[i];
             }
             if (checksum != 0)
-            { // ToDo:ƒf[ƒ^ˆÙí‘Îô‚ÌŽÀ‘•;
+            { // ToDo:ãƒ‡ãƒ¼ã‚¿ç•°å¸¸å¯¾ç­–ã®å®Ÿè£…;
               printf("error: receive checksum mismatch. seq:%02x\n", _idx_recv_queue);
               q->state = q->state_error_recv;
               return error_t::err_failed;
@@ -250,28 +259,37 @@ namespace lhal
     return error_t::err_ok;
   }
 
-  error_t LovyanHAL::proc_queue(void)
+  error_t LovyanHAL_PC::proc_queue(void)
   {
-    auto ms = millis();
-    do
+    error_t result = _proc_receive();
+    if (result != error_t::err_ok)
     {
-      if (millis() - ms > timeout_msec)
+      return result;
+    }
+
+    if (_queued_bytes >= 192)
+    {
+      auto ms = millis();
+      do
       {
-        printf("error: receive timeout.\n");
-        return error_t::err_failed;
-      }
-      error_t result = _proc_receive();
-      if (result != error_t::err_ok)
-      {
-        return result;
-      }
-    } while (_queued_bytes >= 192);
+        error_t result = _proc_receive();
+        if (result != error_t::err_ok)
+        {
+          return result;
+        }
+        if (millis() - ms > timeout_msec)
+        {
+          printf("error: receive timeout.\n");
+          return error_t::err_failed;
+        }
+      } while (_queued_bytes >= 192);
+    }
 
     {
       auto q = &_queue[_idx_send_queue];
       if (q->state == queue_data_t::state_wait_send)
       {
-        // ƒf[ƒ^‘—Mˆ—;
+        // ãƒ‡ãƒ¼ã‚¿é€ä¿¡å‡¦ç†;
         int retry = 16;
         _queued_bytes += q->sendlen;
         while (!_transport->write((const uint8_t*)q->sendbuf, q->sendlen) && --retry)
@@ -280,7 +298,7 @@ namespace lhal
           delay(16);
           _transport->connect();
         }
-        // retry‚ª0‚È‚ç‘—MŽ¸”sAretry‚ªŽc‚Á‚Ä‚¢‚é‚È‚ç‘—M¬Œ÷;
+        // retryãŒ0ãªã‚‰é€ä¿¡å¤±æ•—ã€retryãŒæ®‹ã£ã¦ã„ã‚‹ãªã‚‰é€ä¿¡æˆåŠŸ;
         if (!retry)
         {
           q->state = queue_data_t::state_error_send;
@@ -293,7 +311,7 @@ namespace lhal
     return error_t::err_ok;
   }
 
-  size_t LovyanHAL::_recvCommand(void)
+  size_t LovyanHAL_PC::_recvCommand(void)
   {
     auto ms = millis();
     _recvbuf = _queue[_idx_current_queue].recvbuf;
@@ -359,16 +377,16 @@ namespace lhal
     return 0;
   }
 
-  void LHAL::GPIO_t::setMode(gpio::gpio_pin_t pin, mode_t mode)
+  void LovyanHAL::GPIO_HAL::setMode(gpio_port_pin_t pin, mode_t mode)
   {
-    if (pin == (gpio::gpio_pin_t)~0u) { return; }
+    if (pin.isInvalid()) { return; }
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_set_mode;
     _lhal->_sendbuf[internal::cmd_payload_idx + 1] = pin;
     _lhal->_sendbuf[internal::cmd_payload_idx + 2] = mode;
     _lhal->_sendCommand(3);
   }
 
-  void LHAL::GPIO_t::writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask)
+  void LovyanHAL::GPIO_HAL::writePortHigh(gpio::port_num_t port, gpio::pin_mask_t bitmask)
   {
     int pin = port << gpio::port_shift;
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_write_high;
@@ -384,7 +402,7 @@ namespace lhal
     _lhal->_sendCommand(idx);
   }
 
-  void LHAL::GPIO_t::writePortLow(gpio::port_num_t port, gpio::pin_mask_t bitmask)
+  void LovyanHAL::GPIO_HAL::writePortLow(gpio::port_num_t port, gpio::pin_mask_t bitmask)
   {
     int pin = port << gpio::port_shift;
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_write_high;
@@ -400,25 +418,25 @@ namespace lhal
     _lhal->_sendCommand(idx);
   }
 
-  void LHAL::GPIO_t::writeHigh(gpio::gpio_pin_t pin)
+  void LovyanHAL::GPIO_HAL::writeHigh(gpio_port_pin_t pin)
   {
-    if (pin == (gpio::gpio_pin_t)~0u) { return; }
+    if (pin.isInvalid()) { return; }
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_write_high;
     _lhal->_sendbuf[internal::cmd_payload_idx + 1] = pin;
     _lhal->_sendCommand(2);
   }
 
-  void LHAL::GPIO_t::writeLow(gpio::gpio_pin_t pin)
+  void LovyanHAL::GPIO_HAL::writeLow(gpio_port_pin_t pin)
   {
-    if (pin == (gpio::gpio_pin_t)~0u) { return; }
+    if (pin.isInvalid()) { return; }
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_write_low;
     _lhal->_sendbuf[internal::cmd_payload_idx + 1] = pin;
     _lhal->_sendCommand(2);
   }
 
-  bool LHAL::GPIO_t::read(gpio::gpio_pin_t pin)
+  bool LovyanHAL::GPIO_HAL::read(gpio_port_pin_t pin)
   {
-    if (pin == (gpio::gpio_pin_t)~0u) { return false; }
+    if (pin.isInvalid()) { return false; }
     _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::gpio_read;
     _lhal->_sendbuf[internal::cmd_payload_idx + 1] = pin;
     if (_lhal->_sendCommand(2) == error_t::err_ok)
@@ -429,6 +447,197 @@ namespace lhal
       }
     }
     return false;
+  }
+
+
+//--------------------------------------------------------------------------------
+
+  size_t IBus_PC::_update_last_error(void)
+  {
+    _last_error = error_t::err_failed;
+    auto len = _lhal->_recvCommand();
+    if (len > (2 + internal::cmd_prefix_len + internal::cmd_suffix_len))
+    {
+      _last_error = (error_t)
+        ( _lhal->_recvbuf[len - internal::cmd_suffix_len - 2] << 8
+        | _lhal->_recvbuf[len - internal::cmd_suffix_len - 1] );
+    }
+    return len;
+  }
+
+  void IBus_PC::_write_internal(const uint8_t* data, size_t len, uint8_t cmd)
+  {
+    do
+    {
+      _lhal->_sendbuf[internal::cmd_payload_idx + 0] = cmd;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+      size_t l = std::min<size_t>(len, internal::cmd_payload_maxlen - 2);
+      //size_t l = std::min<size_t>(len, 248);
+      memcpy(&_lhal->_sendbuf[internal::cmd_payload_idx + 2], data, l);
+      _lhal->_sendCommand(l + 2);
+      data += l;
+      len -= l;
+    } while (len);
+
+    _update_last_error();
+  }
+
+  void IBus_PC::_write_repeat_internal(uint32_t data, uint8_t bytes, size_t repeat_count, uint8_t cmd)
+  {
+    if ((uint8_t)(bytes - 1) > 3u) { return; }
+    int idx = internal::cmd_payload_idx + 0;
+    auto buf = _lhal->_sendbuf;
+    buf[idx++] = cmd;
+    buf[idx++] = _bus_number;
+    buf[idx++] = (uint8_t)(repeat_count >> 24);
+    buf[idx++] = (uint8_t)(repeat_count >> 16);
+    buf[idx++] = (uint8_t)(repeat_count >> 8);
+    buf[idx++] = (uint8_t)(repeat_count);
+    buf[idx++] = bytes;
+    do
+    {
+      buf[idx++] = (uint8_t)data;
+      data >>= 8;
+    } while (--bytes);
+    _lhal->_sendCommand(idx);
+
+    _update_last_error();
+  }
+  /*
+  void IBus_PC::write16(uint16_t data)
+  {
+    uint8_t buf[2] = { (uint8_t)(data >> 8), (uint8_t)data };
+    _write_internal(buf, 2, internal::command::bus_write);
+
+    _update_last_error();
+  }
+//*/
+
+  void IBus_PC::read(uint8_t* data, size_t len, bool nack)
+  {
+    do
+    {
+      size_t l = std::min<size_t>(len, internal::cmd_payload_maxlen - 2);
+      len -= l;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_read;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 2] = l;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 3] = (len == 0) && nack;
+      _lhal->_sendCommand(4);
+
+      size_t readlen = _update_last_error();
+      if (isError())
+      {
+        return;
+      }
+      memcpy(data, &_lhal->_recvbuf[internal::cmd_payload_idx + 1], l);
+      data += l;
+    } while (len);
+  }
+
+//--------------------------------------------------------------------------------
+
+  error_t Bus_SPI::init(void)
+  {
+    auto res = IBus_PC::init();
+    if (checkSuccess(res))
+    {
+      _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_init;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 2] = bus_type_t::bus_spi;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 3] = _cfg.pin_sclk.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 4] = _cfg.pin_mosi.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 5] = _cfg.pin_miso.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 6] = _cfg.pin_dc.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 7] = 255; // hw_periph_num
+      _lhal->_sendCommand(7);
+      _update_last_error();
+    }
+    return getLastError();
+  }
+
+  void Bus_SPI::beginTransaction(ITransaction* transaction, bool read, int dummy_clock_bits)
+  {
+    _transaction = transaction;
+    _last_error = err_ok;
+    auto tr = reinterpret_cast<TransactionSPI*>(_transaction);
+    _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_begin_transaction;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 2] = tr->pin_cs;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 3] = read;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 4] = dummy_clock_bits;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 5] = tr->spi_mode;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 6] = tr->read_by_mosi;
+    _lhal->_sendCommand(5);
+    _update_last_error();
+  }
+
+  // é€šä¿¡ã‚’çµ‚äº†ã™ã‚‹;
+  void Bus_SPI::endTransaction(void)
+  {
+    _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_end_transaction;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+    _lhal->_sendCommand(2);
+    _update_last_error();
+  }
+
+  void Bus_SPI::dcControl(bool value)
+  {
+    waitBusy();
+    if (_cfg.pin_dc.isValid())
+    {
+      _lhal->Gpio.write(_cfg.pin_dc, value);
+    }
+  }
+  void Bus_SPI::csControl(bool value, bool read)
+  {
+    waitBusy();
+    auto tr = reinterpret_cast<TransactionSPI*>(_transaction);
+    _lhal->Gpio.write(_cfg.pin_sclk, (tr->spi_mode & 2));
+    tr->csControl(this, value, read);
+  }
+
+//--------------------------------------------------------------------------------
+
+  error_t Bus_I2C::init(void)
+  {
+    auto res = IBus_PC::init();
+    if (checkSuccess(res))
+    {
+      _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_init;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 2] = bus_type_t::bus_i2c;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 3] = _cfg.pin_scl.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 4] = _cfg.pin_sda.num;
+      _lhal->_sendbuf[internal::cmd_payload_idx + 5] = 255; // hw_periph_num
+      _lhal->_sendCommand(5);
+      _update_last_error();
+    }
+    return getLastError();
+  }
+
+  void Bus_I2C::beginTransaction(ITransaction* transaction, bool read, int dummy_clock_bits)
+  {
+    _transaction = transaction;
+    _last_error = err_ok;
+    auto tr = reinterpret_cast<TransactionI2C*>(_transaction);
+    _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_begin_transaction;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 2] = tr->i2c_addr;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 3] = read;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 4] = tr->dc_prefix[0];
+    _lhal->_sendbuf[internal::cmd_payload_idx + 5] = tr->dc_prefix[1];
+    _lhal->_sendCommand(5);
+    _update_last_error();
+  }
+
+  // é€šä¿¡ã‚’çµ‚äº†ã™ã‚‹;
+  void Bus_I2C::endTransaction(void)
+  {
+    _lhal->_sendbuf[internal::cmd_payload_idx + 0] = internal::command::bus_end_transaction;
+    _lhal->_sendbuf[internal::cmd_payload_idx + 1] = _bus_number;
+    _lhal->_sendCommand(2);
+    _update_last_error();
   }
 }
 

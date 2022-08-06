@@ -50,15 +50,17 @@ namespace lhal
     // ホストとの接続にTCP通信を用いる場合のポート番号;
     static constexpr size_t default_tcp_port = 63243;
     static constexpr uint32_t default_serial_baudrate = 115200;
+    // static constexpr uint32_t default_serial_baudrate = 115200*8;
+    // static constexpr uint32_t default_serial_baudrate = 1500000;
 
 
-    static constexpr size_t cmd_stx_idx = 0;     // _sendbuf内のSTXヘッダの位置 ;
-    static constexpr size_t cmd_seqnum_idx = 1;  // _sendbuf内のシーケンス番号位置 ;
-    static constexpr size_t cmd_datalen_idx = 2; // _sendbuf内のデータサイズ位置 ;
-    static constexpr size_t cmd_payload_idx = 3; // _sendbuf内のデータ部位置 ;
-    static constexpr size_t cmd_prefix_len = 3;  // _sendbuf先頭のプリフィクスサイズ 3Byte (STX,シーケンス番号,データ長) ;
-    static constexpr size_t cmd_suffix_len = 2;  // _sendbuf末尾のサフィックスサイズ 2Byte (チェックサム,ETX) ;
-    static constexpr size_t cmd_payload_maxlen = 256 - (cmd_prefix_len + cmd_suffix_len);  // データ部の最大長
+    static constexpr size_t cmd_prefix_len = 3;  // コマンドデータ先頭のプリフィクスサイズ 3Byte (STX,シーケンス番号,データ長) ;
+    static constexpr size_t cmd_suffix_len = 2;  // コマンドデータ末尾のサフィックスサイズ 2Byte (チェックサム,ETX) ;
+    static constexpr size_t cmd_payload_maxlen = 252 - (cmd_prefix_len + cmd_suffix_len);  // データ部の最大長
+    static constexpr size_t cmd_stx_idx = 0;     // コマンドデータ内のSTXヘッダの位置 ;
+    static constexpr size_t cmd_seqnum_idx = 1;  // コマンドデータ内のシーケンス番号位置 ;
+    static constexpr size_t cmd_datalen_idx = 2; // コマンドデータ内のデータサイズ位置 ;
+    static constexpr size_t cmd_payload_idx = 3; // コマンドデータ内のデータ部開始位置 ;
 
     enum control_code : uint8_t
     {
@@ -75,6 +77,17 @@ namespace lhal
       gpio_read_port = 0x11,
       gpio_write_low = 0x14,
       gpio_write_high = 0x15,
+
+      bus_init = 0x20,
+      bus_begin_transaction = 0x21,
+      bus_end_transaction = 0x22,
+      bus_read = 0x23,
+      bus_write = 0x30,
+      bus_write_command = 0x31,
+      bus_write_data = 0x32,
+      bus_write_repeat = 0x33,
+      bus_write_command_repeat = 0x34,
+      bus_write_data_repeat = 0x35,
     };
   }
 }

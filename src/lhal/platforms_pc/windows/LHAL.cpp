@@ -10,15 +10,17 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#include "../init.hpp"
+#include "../../platform_check.hpp"
 
-#if LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_WINDOWS
+#if defined (LHAL_TARGET_PLATFORM) && (LHAL_TARGET_PLATFORM_NUMBER == LHAL_PLATFORM_NUMBER_WINDOWS)
 
 #include "LHAL.hpp"
 
 #pragma comment(lib, "Ws2_32.lib")
 
 #include <stdio.h>
+#include <thread>
+#include <future>
 
 namespace lhal
 {
@@ -80,7 +82,7 @@ namespace lhal
       return INVALID_HANDLE_VALUE;
     }
 
-    int check = SetupComm(hCom, 4096, 256);
+    int check = SetupComm(hCom, 4096, 512);
     if (check == FALSE) {
       printf("%s : SetupComm failed with error %d.\n", name, GetLastError());
       CloseHandle(hCom);
@@ -89,7 +91,7 @@ namespace lhal
 
     DCB dcb;
     GetCommState(hCom, &dcb);
-    // à»â∫ÇÃê›íËÇÕïœçXÇ∑ÇÈÇ∆É{Å[ÉhÇ…ÇÊÇ¡ÇƒÇÕí êMïsî\Ç…Ç»ÇÈÇÃÇ≈ÅAä¬ã´Ç©ÇÁéÊìæÇµÇΩílÇÃÇ‹Ç‹Ç≈ÇÊÇ¢ÅBïœçXÇµÇ»Ç¢Ç±Ç∆ÅB;
+    // ‰ª•‰∏ã„ÅÆË®≠ÂÆö„ÅØÂ§âÊõ¥„Åô„Çã„Å®„Éú„Éº„Éâ„Å´„Çà„Å£„Å¶„ÅØÈÄö‰ø°‰∏çËÉΩ„Å´„Å™„Çã„ÅÆ„Åß„ÄÅÁí∞Â¢É„Åã„ÇâÂèñÂæó„Åó„ÅüÂÄ§„ÅÆ„Åæ„Åæ„Åß„Çà„ÅÑ„ÄÇÂ§âÊõ¥„Åó„Å™„ÅÑ„Åì„Å®„ÄÇ;
     // dcb.fOutxCtsFlow ;
     // dcb.fOutxDsrFlow ;
     // dcb.fDtrControl ;
@@ -130,7 +132,7 @@ namespace lhal
 
     TimeOut.ReadTotalTimeoutMultiplier = 0;
     TimeOut.ReadTotalTimeoutConstant = 0;
-    TimeOut.WriteTotalTimeoutMultiplier = 1;
+    TimeOut.WriteTotalTimeoutMultiplier = 2;
     TimeOut.WriteTotalTimeoutConstant = 256;
     TimeOut.ReadIntervalTimeout = MAXDWORD;
 
@@ -156,7 +158,7 @@ namespace lhal
 
   // --------------------------------------------------------------------------------
 
-  error_t LHAL::TransportCom::init(const char* target)
+  error_t LovyanHAL::TransportCom::init(const char* target)
   {
     if (target == nullptr || target[0] == 0)
     {
@@ -175,14 +177,14 @@ namespace lhal
     return error_t::err_failed;
   }
 
-  int LHAL::TransportCom::write(const uint8_t* data, size_t len)
+  int LovyanHAL::TransportCom::write(const uint8_t* data, size_t len)
   {
     DWORD writelen = 0;
     WriteFile(_com, data, len, &writelen, nullptr);
     return writelen;
   }
 
-  void LHAL::TransportCom::disconnect(void)
+  void LovyanHAL::TransportCom::disconnect(void)
   {
     if (_com != INVALID_HANDLE_VALUE)
     {
@@ -191,7 +193,7 @@ namespace lhal
     }
   }
 
-  error_t LHAL::TransportCom::connect(void)
+  error_t LovyanHAL::TransportCom::connect(void)
   {
     disconnect();
     if (_target != nullptr && _target[0] != 0)
@@ -201,7 +203,7 @@ namespace lhal
     return (_com == INVALID_HANDLE_VALUE) ? error_t::err_failed : error_t::err_ok;
   }
 
-  int LHAL::TransportCom::read(void)
+  int LovyanHAL::TransportCom::read(void)
   {
     DWORD len = 0;
     uint8_t buf[4];
@@ -214,7 +216,7 @@ namespace lhal
 
 // --------------------------------------------------------------------------------
 
-  error_t LHAL::TransportSock::init(const char* target)
+  error_t LovyanHAL::TransportSock::init(const char* target)
   {
     _sock = createSockHandle(target);
 
@@ -226,7 +228,7 @@ namespace lhal
     return error_t::err_failed;
   }
 
-  int LHAL::TransportSock::write(const uint8_t* data, size_t len)
+  int LovyanHAL::TransportSock::write(const uint8_t* data, size_t len)
   {
     auto res = send(_sock, (const char*)data, len, 0);
     if (res != len)
@@ -236,7 +238,7 @@ namespace lhal
     return res;
   }
 
-  int LHAL::TransportSock::read(void)
+  int LovyanHAL::TransportSock::read(void)
   {
     uint8_t buf[4];
     int len = recv(_sock, (char*)buf, 1, 0);
@@ -245,13 +247,13 @@ namespace lhal
 
 // --------------------------------------------------------------------------------
 
-  LHAL::LHAL(internal::ITransportLayer* transport_layer)
-    : LovyanHAL { transport_layer }
+  LovyanHAL::LovyanHAL(internal::ITransportLayer* transport_layer)
+    : LovyanHAL_PC { transport_layer }
   {
   }
 
-  LHAL::LHAL(const char* target)
-   : LovyanHAL {}
+  LovyanHAL::LovyanHAL(const char* target)
+   : LovyanHAL_PC {}
   {
     if (target)
     {
@@ -263,13 +265,14 @@ namespace lhal
     }
   }
 
-  error_t LHAL::init(void)
+  error_t LovyanHAL::init(void)
   {
     if (_transport == nullptr)
     {
       error_t result = error_t::err_failed;
       if (_target[0] == 0)
       {
+//*
         for (int i = 2; (error_t::err_ok != result) && i < 100; ++i)
         {
           snprintf(_target, sizeof(_target), "COM%d", i);
@@ -284,6 +287,25 @@ namespace lhal
             }
           }
         }
+/*/
+        std::vector<LHAL> hals;
+        std::vector<std::future<lhal::error_t> > results;
+        for (int i = 0; i < 99; ++i)
+        {
+          char name[16];
+          snprintf(name, sizeof(name), "COM%d", i + 2);
+          hals.push_back(LHAL(name));
+          LHAL* lp = &(hals.back());
+          auto r = std::async(&LHAL::init, lp);
+          results.push_back(r);
+        }
+
+        for (auto &hal: hals)
+        {
+//          hal
+//          printf("%02d:result = %d \n",i, result[i].get());
+        }
+//*/
       }
       else
       {
@@ -317,7 +339,7 @@ namespace lhal
       }
     }
     printf("connect !\n");
-    return LovyanHAL::init();
+    return LovyanHAL_PC::init();
   }
 }
 

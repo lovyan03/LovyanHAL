@@ -13,7 +13,7 @@ Author:
 #pragma once
 
 #include "init.hpp"
-#include "../../use_with_host/for_host.hpp"
+#include "../LovyanHAL_PC.hpp"
 
 #include <WinSock2.h>
 
@@ -23,7 +23,7 @@ Author:
 
 namespace lhal
 {
-  class LHAL : public LovyanHAL
+  class LovyanHAL : public LovyanHAL_PC
   {
     class TransportCom : public internal::ITransportLayer
     {
@@ -56,8 +56,8 @@ namespace lhal
 
   public:
 
-    LHAL(const char* target = LHAL_DEFAULT_CONNECTION_NAME);
-    LHAL(internal::ITransportLayer* transport_layer);
+    LovyanHAL(const char* target = LHAL_DEFAULT_CONNECTION_NAME);
+    LovyanHAL(internal::ITransportLayer* transport_layer);
 
     error_t init(void) override;
   };

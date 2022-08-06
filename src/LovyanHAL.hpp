@@ -18,6 +18,6 @@ Author:
 
 #include "lhal/init.hpp"
 
-using LHAL = lhal::LHAL;
+using LHAL = lhal::LovyanHAL;
 
 #endif

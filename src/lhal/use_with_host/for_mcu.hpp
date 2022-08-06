@@ -14,13 +14,13 @@ Author:
 #define LOVYANHAL_USE_WITH_HOST_FOR_MCU_HPP_
 
 #include "../init.hpp"
-#include "common.hpp"
+#include "../platforms_pc/common.hpp"
 
 namespace lhal
 {
   namespace internal
   {
-    void perform_use_with_host(LHAL* hal, ITransportLayer* st);
+    void perform_use_with_host(LovyanHAL* hal, ITransportLayer* st);
   }
 }
 

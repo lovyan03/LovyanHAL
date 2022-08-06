@@ -14,11 +14,37 @@ Author:
 #define LOVYANHAL_INIT_HPP_
 
 #include "gitTagVersion.h"
-#include "platforms/init.hpp"
+#include "platform_check.hpp"
 
-namespace lhal
-{
-  using namespace gpio;
-}
+
+#if defined (LHAL_TARGET_PLATFORM)
+
+  #if defined ( ARDUINO )
+   #include <Arduino.h>
+  #endif
+
+
+  #define LHAL_LOCAL_INCLUDE(x) #x
+  #define LHAL_CONCAT(x, y) LHAL_LOCAL_INCLUDE(x/y)
+
+  #include LHAL_CONCAT(LHAL_TARGET_PLATFORM, init.hpp)
+  #include "common.hpp"
+  #include LHAL_CONCAT(LHAL_TARGET_PLATFORM, LHAL.hpp)
+
+  #undef LHAL_CONCAT
+  #undef LHAL_LOCAL_INCLUDE
+
+  #include "IBus.hpp"
+
+  namespace lhal
+  {
+    using namespace gpio;
+  }
+
+#else
+
+ #warning "unsupported platform..."
+
+#endif
 
 #endif
