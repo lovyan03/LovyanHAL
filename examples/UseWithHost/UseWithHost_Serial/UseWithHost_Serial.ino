@@ -1,5 +1,5 @@
 #include <LovyanHAL.hpp>
-#include <lhal/use_with_host/for_mcu.hpp>
+#include <LHAL_terminal.hpp>
 
 class TransportStream : public lhal::internal::ITransportLayer
 {
@@ -10,7 +10,7 @@ public:
 
   int read(void) override
   {
-    return _st->read();
+    return (_st->available()) ? _st->read() : -1;
   }
 
   int write(uint8_t value) override

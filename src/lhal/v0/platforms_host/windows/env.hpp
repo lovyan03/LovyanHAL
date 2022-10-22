@@ -10,9 +10,22 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#ifndef LOVYANHAL_HPP_
-#define LOVYANHAL_HPP_
+#pragma once
 
-#include "lhal/init_v0.hpp"
+#include <stdint.h>
 
-#endif
+namespace lhal
+{
+ namespace v0
+ {
+
+  namespace gpio
+  {
+    typedef uint8_t port_num_t;   // ポート番号用の型;
+    typedef uint8_t pin_num_t;    // ポート内ピン番号の型;
+    typedef uint8_t pin_mask_t;   // 同一ポート内でのピンビットマスク値;
+    static constexpr const uint8_t port_shift = 3; // 3bit = 0-7
+  }
+
+ }
+}

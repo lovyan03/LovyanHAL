@@ -10,9 +10,20 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#ifndef LOVYANHAL_HPP_
-#define LOVYANHAL_HPP_
+#include "init.hpp"
 
-#include "lhal/init_v0.hpp"
+#if !defined (LHAL_TARGET_PLATFORM)
+
+#warning "unsupported platform..."
+
+#else
+
+#define LHAL_LOCAL_INCLUDE(x) #x
+#define LHAL_CONCAT(x, y) LHAL_LOCAL_INCLUDE(x/y)
+
+#include LHAL_CONCAT(LHAL_TARGET_PLATFORM, code.inl)
+
+#undef LHAL_CONCAT
+#undef LHAL_LOCAL_INCLUDE
 
 #endif

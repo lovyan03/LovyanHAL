@@ -10,9 +10,9 @@ Licence:
 Author:
  [lovyan03](https://twitter.com/lovyan03)
 /----------------------------------------------------------------------------*/
-#ifndef LOVYANHAL_HPP_
-#define LOVYANHAL_HPP_
+#ifndef LOVYANHAL_LHAL_TERMINAL_HPP_
+#define LOVYANHAL_LHAL_TERMINAL_HPP_
 
-#include "lhal/init_v0.hpp"
+#include "lhal/v0/linkmode/for_mcu.hpp"
 
 #endif
