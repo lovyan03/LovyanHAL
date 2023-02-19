@@ -12,7 +12,7 @@ Author:
 /----------------------------------------------------------------------------*/
 #pragma once
 
-#include "init.hpp"
+#include "../../init.hpp"
 #include "../LovyanHAL_HOST.hpp"
 
 #include <WinSock2.h>

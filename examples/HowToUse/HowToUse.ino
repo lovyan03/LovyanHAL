@@ -21,7 +21,7 @@ void setup(void)
   auto pin4 = hal.convertArduinoPinNumber(4);
 
   // Arduino環境の4番ピンをinput_pullupモードにする;
-  hal.Gpio.setMode(pin4, hal.Gpio.input_pullup);
+  hal.Gpio.setMode(pin4, lhal::gpio::input_pullup);
 
   // 4番ピンを読み取る;
   bool pin4value = hal.Gpio.read(pin4);
@@ -30,7 +30,7 @@ void setup(void)
   auto pin5 = hal.convertArduinoPinNumber(5);
 
   // Arduino環境の5番ピンをoutputモードにする;
-  hal.Gpio.setMode(pin5, hal.Gpio.output);
+  hal.Gpio.setMode(pin5, lhal::gpio::output);
 
   // 5番ピンの出力を4番ピンと同じにする;
   hal.Gpio.write(pin5, pin4value);
@@ -45,10 +45,10 @@ void setup(void)
   auto led = hal.Gpio.getHost(hal.convertArduinoPinNumber(13));
 
   // ボタンをinputモードにする;
-  btn.setMode( hal.Gpio.input );
+  btn.setMode( lhal::gpio::input );
 
   // LEDをoutputモードにする;
-  led.setMode( hal.Gpio.output );
+  led.setMode( lhal::gpio::output );
 
   for (;;)
   {
